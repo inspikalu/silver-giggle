@@ -1,0 +1,647 @@
+{
+    "address": "7qxSTmvtX1ixzXcCgQ322UfaQkbmPvfokXRwKFs8TYh3",
+    "metadata": {
+      "name": "anchor_project",
+      "version": "0.1.0",
+      "spec": "0.1.0",
+      "description": "Created with Anchor"
+    },
+    "instructions": [
+      {
+        "name": "buy_tickets",
+        "discriminator": [
+          48,
+          16,
+          122,
+          137,
+          24,
+          214,
+          198,
+          58
+        ],
+        "accounts": [
+          {
+            "name": "raffle_state",
+            "writable": true
+          },
+          {
+            "name": "participant_tickets",
+            "writable": true,
+            "pda": {
+              "seeds": [
+                {
+                  "kind": "const",
+                  "value": [
+                    112,
+                    97,
+                    114,
+                    116,
+                    105,
+                    99,
+                    105,
+                    112,
+                    97,
+                    110,
+                    116,
+                    45,
+                    116,
+                    105,
+                    99,
+                    107,
+                    101,
+                    116,
+                    115
+                  ]
+                },
+                {
+                  "kind": "account",
+                  "path": "raffle_state"
+                },
+                {
+                  "kind": "account",
+                  "path": "participant"
+                }
+              ]
+            }
+          },
+          {
+            "name": "participant",
+            "writable": true,
+            "signer": true
+          },
+          {
+            "name": "participant_token_account",
+            "writable": true
+          },
+          {
+            "name": "proceeds_token_account",
+            "writable": true
+          },
+          {
+            "name": "token_program",
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          },
+          {
+            "name": "system_program",
+            "address": "11111111111111111111111111111111"
+          }
+        ],
+        "args": [
+          {
+            "name": "params",
+            "type": {
+              "defined": {
+                "name": "BuyTicketParams"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "claim_prizes",
+        "discriminator": [
+          76,
+          144,
+          95,
+          183,
+          178,
+          231,
+          121,
+          76
+        ],
+        "accounts": [
+          {
+            "name": "raffle_state"
+          },
+          {
+            "name": "winning_ticket",
+            "writable": true
+          },
+          {
+            "name": "winner",
+            "writable": true,
+            "signer": true
+          },
+          {
+            "name": "proceeds_token_account",
+            "writable": true
+          },
+          {
+            "name": "winner_token_account",
+            "writable": true
+          },
+          {
+            "name": "authority",
+            "writable": true,
+            "signer": true
+          },
+          {
+            "name": "token_program",
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "close_raffles",
+        "discriminator": [
+          209,
+          163,
+          10,
+          180,
+          130,
+          197,
+          241,
+          103
+        ],
+        "accounts": [
+          {
+            "name": "raffle_state"
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "draw_winners",
+        "discriminator": [
+          43,
+          87,
+          86,
+          4,
+          32,
+          104,
+          203,
+          209
+        ],
+        "accounts": [
+          {
+            "name": "raffle_state",
+            "writable": true
+          },
+          {
+            "name": "winning_ticket",
+            "writable": true,
+            "pda": {
+              "seeds": [
+                {
+                  "kind": "const",
+                  "value": [
+                    119,
+                    105,
+                    110,
+                    110,
+                    105,
+                    110,
+                    103,
+                    45,
+                    116,
+                    105,
+                    99,
+                    107,
+                    101,
+                    116
+                  ]
+                },
+                {
+                  "kind": "account",
+                  "path": "raffle_state"
+                }
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "writable": true,
+            "signer": true
+          },
+          {
+            "name": "system_program",
+            "address": "11111111111111111111111111111111"
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "initialize_raffles",
+        "discriminator": [
+          83,
+          133,
+          183,
+          140,
+          17,
+          149,
+          63,
+          160
+        ],
+        "accounts": [
+          {
+            "name": "authority",
+            "writable": true,
+            "signer": true
+          },
+          {
+            "name": "raffle_state",
+            "writable": true,
+            "pda": {
+              "seeds": [
+                {
+                  "kind": "const",
+                  "value": [
+                    114,
+                    97,
+                    102,
+                    102,
+                    108,
+                    101
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "ticket_mint",
+            "writable": true
+          },
+          {
+            "name": "proceeds_token_account",
+            "writable": true
+          },
+          {
+            "name": "token_program",
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          },
+          {
+            "name": "associated_token_program",
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+          },
+          {
+            "name": "system_program",
+            "address": "11111111111111111111111111111111"
+          }
+        ],
+        "args": [
+          {
+            "name": "params",
+            "type": {
+              "defined": {
+                "name": "InitializeRaffleParams"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "accounts": [
+      {
+        "name": "ParticipantTickets",
+        "discriminator": [
+          178,
+          197,
+          214,
+          106,
+          21,
+          1,
+          133,
+          36
+        ]
+      },
+      {
+        "name": "RaffleState",
+        "discriminator": [
+          160,
+          186,
+          30,
+          174,
+          174,
+          156,
+          156,
+          244
+        ]
+      },
+      {
+        "name": "WinningTicket",
+        "discriminator": [
+          28,
+          60,
+          234,
+          165,
+          61,
+          144,
+          14,
+          207
+        ]
+      }
+    ],
+    "events": [
+      {
+        "name": "PrizeClaimed",
+        "discriminator": [
+          213,
+          150,
+          192,
+          76,
+          199,
+          33,
+          212,
+          38
+        ]
+      },
+      {
+        "name": "RaffleInitialized",
+        "discriminator": [
+          165,
+          103,
+          4,
+          151,
+          108,
+          44,
+          93,
+          177
+        ]
+      },
+      {
+        "name": "TicketsBought",
+        "discriminator": [
+          204,
+          103,
+          221,
+          60,
+          70,
+          142,
+          88,
+          233
+        ]
+      },
+      {
+        "name": "WinnerDrawn",
+        "discriminator": [
+          213,
+          103,
+          5,
+          118,
+          145,
+          75,
+          146,
+          120
+        ]
+      }
+    ],
+    "errors": [
+      {
+        "code": 6000,
+        "name": "InvalidDuration",
+        "msg": "Invalid duration for the raffle."
+      },
+      {
+        "code": 6001,
+        "name": "RaffleNotActive",
+        "msg": "Raffle is not currently active."
+      },
+      {
+        "code": 6002,
+        "name": "MaxTicketsExceeded",
+        "msg": "Exceeded maximum tickets for this raffle."
+      },
+      {
+        "code": 6003,
+        "name": "TicketPurchaseOverflow",
+        "msg": "Ticket purchase overflow."
+      },
+      {
+        "code": 6004,
+        "name": "TicketPriceCalculationError",
+        "msg": "Error calculating ticket price."
+      },
+      {
+        "code": 6005,
+        "name": "RaffleStillActive",
+        "msg": "Raffle is still active."
+      },
+      {
+        "code": 6006,
+        "name": "RaffleAlreadyFinalized",
+        "msg": "Raffle is already finalized."
+      },
+      {
+        "code": 6007,
+        "name": "UnauthorizedPrizeClaim",
+        "msg": "Unauthorized claim attempt."
+      },
+      {
+        "code": 6008,
+        "name": "RaffleNotFinalized",
+        "msg": "Raffle has not been finalized."
+      },
+      {
+        "code": 6009,
+        "name": "TicketPurchaseExceedsLimit",
+        "msg": "Ticket purchase exceeds limit."
+      }
+    ],
+    "types": [
+      {
+        "name": "BuyTicketParams",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "ticket_quantity",
+              "type": "u64"
+            }
+          ]
+        }
+      },
+      {
+        "name": "InitializeRaffleParams",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "raffle_id",
+              "type": "u64"
+            },
+            {
+              "name": "ticket_price",
+              "type": "u64"
+            },
+            {
+              "name": "max_tickets",
+              "type": "u64"
+            },
+            {
+              "name": "duration_seconds",
+              "type": "u64"
+            },
+            {
+              "name": "prize_mint",
+              "type": {
+                "option": "pubkey"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ParticipantTickets",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "participant",
+              "type": "pubkey"
+            },
+            {
+              "name": "tickets_bought",
+              "type": "u64"
+            },
+            {
+              "name": "first_purchase_time",
+              "type": "i64"
+            }
+          ]
+        }
+      },
+      {
+        "name": "PrizeClaimed",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "raffle_id",
+              "type": "u64"
+            },
+            {
+              "name": "winner",
+              "type": "pubkey"
+            }
+          ]
+        }
+      },
+      {
+        "name": "RaffleInitialized",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "raffle_id",
+              "type": "u64"
+            },
+            {
+              "name": "authority",
+              "type": "pubkey"
+            }
+          ]
+        }
+      },
+      {
+        "name": "RaffleState",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "raffle_id",
+              "type": "u64"
+            },
+            {
+              "name": "authority",
+              "type": "pubkey"
+            },
+            {
+              "name": "ticket_mint",
+              "type": "pubkey"
+            },
+            {
+              "name": "proceeds_token_account",
+              "type": "pubkey"
+            },
+            {
+              "name": "ticket_price",
+              "type": "u64"
+            },
+            {
+              "name": "max_tickets",
+              "type": "u64"
+            },
+            {
+              "name": "start_time",
+              "type": "i64"
+            },
+            {
+              "name": "end_time",
+              "type": "i64"
+            },
+            {
+              "name": "total_tickets_sold",
+              "type": "u64"
+            },
+            {
+              "name": "is_finalized",
+              "type": "bool"
+            },
+            {
+              "name": "prize_mint",
+              "type": {
+                "option": "pubkey"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "TicketsBought",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "participant",
+              "type": "pubkey"
+            },
+            {
+              "name": "ticket_quantity",
+              "type": "u64"
+            }
+          ]
+        }
+      },
+      {
+        "name": "WinnerDrawn",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "raffle_id",
+              "type": "u64"
+            },
+            {
+              "name": "winning_ticket_number",
+              "type": "u64"
+            }
+          ]
+        }
+      },
+      {
+        "name": "WinningTicket",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "raffle_state",
+              "type": "pubkey"
+            },
+            {
+              "name": "winner",
+              "type": "pubkey"
+            },
+            {
+              "name": "winning_ticket_number",
+              "type": "u64"
+            },
+            {
+              "name": "draw_time",
+              "type": "i64"
+            }
+          ]
+        }
+      }
+    ]
+  }
