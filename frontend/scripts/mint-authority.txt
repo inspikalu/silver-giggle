@@ -1,0 +1,12 @@
+inspikalu@inspikalu:~/Desktop/ackee-sos-6/Tasks/program-inspikalu/frontend$ node scripts/create-mint.js 
+(node:24889) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/inspikalu/Desktop/ackee-sos-6/Tasks/program-inspikalu/frontend/scripts/create-mint.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/inspikalu/Desktop/ackee-sos-6/Tasks/program-inspikalu/frontend/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Requesting airdrop for mint authority...
+(node:24889) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Creating mint...
+Mint created successfully. Save these values:
+Mint address: AdE6Nn9nSYSZRaECvkC5wXRqT9jK2aywQb48AK3VipB5
+Mint authority private key: py6YK3IOoWB0nc7+Z88bvfk6gYkjjnTJ6+oPfMYzosKvoZVEUO1mETFe1M59X1s+o0pE7GQCc2lKA6t+kgZe+g==
+inspikalu@inspikalu:~/Desktop/ackee-sos-6/Tasks/program-inspikalu/frontend$ 

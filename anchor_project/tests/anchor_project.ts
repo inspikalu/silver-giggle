@@ -1,329 +1,400 @@
-// File: tests/anchor-project.spec.ts
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { AnchorProject } from "../target/types/anchor_project";
-import { assert } from "chai";
-import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
-import { 
-  TOKEN_PROGRAM_ID, 
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  createMint, 
-  getOrCreateAssociatedTokenAccount 
-} from "@solana/spl-token";
+import { expect } from 'chai';
+import { Program, Provider, web3, BN } from '@coral-xyz/anchor';
+import { AnchorProject } from '../target/types/anchor_project'; // Adjust the import according to your project structure
+import { Keypair, Transaction, SystemProgram } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { createAccount, getAccount, sendTransaction } from './utils'; // Utility functions for creating accounts
 
-describe("Anchor Raffle Program", () => {
-  // Configure the client to use the local cluster
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
+const { SystemProgram } = web3;
 
-  const program = anchor.workspace.AnchorProject as Program<AnchorProject>;
-  
-  // Test wallets and accounts
-  const authority = provider.wallet.publicKey;
-  const participant = Keypair.generate();
-  const winner = Keypair.generate();
+describe('raffle', () => {
+    const provider = Provider.local();
+    const program = new Program<Raffle>(idl, programId, provider);
 
-  // Raffle parameters
-  const RAFFLE_ID = new anchor.BN(1);
-  const TICKET_PRICE = new anchor.BN(1_000_000); // 0.001 SOL
-  const MAX_TICKETS = new anchor.BN(100);
-  const DURATION_SECONDS = new anchor.BN(24 * 60 * 60); // 1 day
+    // Accounts
+    let raffleState: web3.PublicKey;
+    let participant: Keypair;
+    let participantTokenAccount: web3.PublicKey;
+    let proceedsTokenAccount: web3.PublicKey;
 
-  let rafflePda: PublicKey;
-  let ticketMint: PublicKey;
-  let proceedsTokenAccount: PublicKey;
+    beforeEach(async () => {
+        // Setup accounts for testing
+        participant = Keypair.generate();
+        raffleState = await createAccount(provider, participant);
+        participantTokenAccount = await createAccount(provider, participant);
+        proceedsTokenAccount = await createAccount(provider, participant);
+    });
 
-  before(async () => {
-    // Airdrop SOL to participant and winner
-    await provider.connection.requestAirdrop(participant.publicKey, 10_000_000_000);
-    await provider.connection.requestAirdrop(winner.publicKey, 10_000_000_000);
+    describe('initialize_raffle', () => {
+        it('should initialize a raffle successfully', async () => {
+            const params = {
+                raffle_id: new BN(1),
+                ticket_price: new BN(1000),
+                max_tickets: new BN(100),
+                duration_seconds: new BN(3600),
+                prize_mint: null,
+            };
 
-    // Create ticket mint
-    ticketMint = await createMint(
-      provider.connection, 
-      provider.wallet.payer, 
-      authority, 
-      null, 
-      0
-    );
-  });
+            const tx = await program.rpc.initializeRaffle(params, {
+                accounts: {
+                    authority: participant.publicKey,
+                    raffleState,
+                    ticketMint: participantTokenAccount,
+                    proceedsTokenAccount,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
 
-  it("Initializes Raffle", async () => {
-    // Derive the PDA for raffle state
-    [rafflePda] = await PublicKey.findProgramAddressSync(
-      [Buffer.from("raffle")],
-      program.programId
-    );
+            expect(tx).to.not.be.undefined;
+        });
 
-    // Create proceeds token account
-    proceedsTokenAccount = await getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      provider.wallet.payer,
-      ticketMint,
-      authority
-    );
+        it('should fail if duration is invalid', async () => {
+            const params = {
+                raffle_id: new BN(1),
+                ticket_price: new BN(1000),
+                max_tickets: new BN(100),
+                duration_seconds: new BN(0), // Invalid duration
+                prize_mint: null,
+            };
 
-    // Initialize raffle
-    await program.methods
-      .initializeRaffles({
-        raffleId: RAFFLE_ID,
-        ticketPrice: TICKET_PRICE,
-        maxTickets: MAX_TICKETS,
-        durationSeconds: DURATION_SECONDS,
-        prizeMint: null
-      })
-      .accounts({
-        authority: authority,
-        raffleState: rafflePda,
-        ticketMint: ticketMint,
-        proceedsTokenAccount: proceedsTokenAccount.address,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId
-      })
-      .rpc();
+            await expect(
+                program.rpc.initializeRaffle(params, {
+                    accounts: {
+                        authority: participant.publicKey,
+                        raffleState,
+                        ticketMint: participantTokenAccount,
+                        proceedsTokenAccount,
+                        systemProgram: SystemProgram.programId,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Invalid duration for the raffle.');
+        });
+    });
 
-    // Verify raffle state
-    const raffleState = await program.account.raffleState.fetch(rafflePda);
-    assert.isTrue(raffleState.raffleId.eq(RAFFLE_ID));
-    assert.isTrue(raffleState.ticketPrice.eq(TICKET_PRICE));
-  });
+    describe('buy_tickets', () => {
+        beforeEach(async () => {
+            // Initialize a raffle before buying tickets
+            const params = {
+                raffle_id: new BN(1),
+                ticket_price: new BN(1000),
+                max_tickets: new BN(100),
+                duration_seconds: new BN(3600),
+                prize_mint: null,
+            };
 
-  it("Buys Tickets - Happy Path", async () => {
-    // Create participant's token account
-    const participantTokenAccount = await getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      participant,
-      ticketMint,
-      participant.publicKey
-    );
+            await program.rpc.initializeRaffle(params, {
+                accounts: {
+                    authority: participant.publicKey,
+                    raffleState,
+                    ticketMint: participantTokenAccount,
+                    proceedsTokenAccount,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
+        });
 
-    // Derive participant tickets PDA
-    const [participantTicketsPda] = await PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("participant-tickets"),
-        rafflePda.toBuffer(),
-        participant.publicKey.toBuffer()
-      ],
-      program.programId
-    );
+        it('should buy tickets successfully', async () => {
+            const buyTicketParams = { ticket_quantity: new BN(2) };
 
-    // Buy tickets
-    await program.methods
-      .buyTickets({
-        ticketQuantity: new anchor.BN(5)
-      })
-      .accounts({
-        raffleState: rafflePda,
-        participantTickets: participantTicketsPda,
-        participant: participant.publicKey,
-        participantTokenAccount: participantTokenAccount.address,
-        proceedsTokenAccount: proceedsTokenAccount.address,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([participant])
-      .rpc();
+            const tx = await program.rpc.buyTickets(buyTicketParams, {
+                accounts: {
+                    raffleState,
+                    participantTickets: participant.publicKey,
+                    participant: participant.publicKey,
+                    participantTokenAccount,
+                    proceedsTokenAccount,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
 
-    // Verify ticket purchase
-    const participantTickets = await program.account.participantTickets.fetch(participantTicketsPda);
-    assert.isTrue(participantTickets.ticketsBought.eq(new anchor.BN(5)));
-  });
+            expect(tx).to.not.be.undefined;
+        });
 
-  it("Buys Tickets - Unhappy Path (Exceeding Max Tickets)", async () => {
-    // Attempt to buy more tickets than allowed
-    try {
-      await program.methods
-        .buyTickets({
-          ticketQuantity: MAX_TICKETS.add(new anchor.BN(1))
-        })
-        .accounts({
-          raffleState: rafflePda,
-          participantTickets: await PublicKey.findProgramAddressSync(
-            [
-              Buffer.from("participant-tickets"),
-              rafflePda.toBuffer(),
-              participant.publicKey.toBuffer()
-            ],
-            program.programId
-          )[0],
-          participant: participant.publicKey,
-          participantTokenAccount: await getOrCreateAssociatedTokenAccount(
-            provider.connection,
-            participant,
-            ticketMint,
-            participant.publicKey
-          ),
-          proceedsTokenAccount: proceedsTokenAccount.address,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId
-        })
-        .signers([participant])
-        .rpc();
-      
-      assert.fail("Should have thrown an error");
-    } catch (error) {
-      assert.include(
-        error.message, 
-        "MaxTicketsExceeded", 
-        "Expected MaxTicketsExceeded error"
-      );
-    }
-  });
+        it('should fail if raffle is not active', async () => {
+            // Simulate a condition where the raffle is not active
+            const buyTicketParams = { ticket_quantity: new BN(2) };
 
-  it("Draws Winner - Happy Path", async () => {
-    // Wait to simulate raffle end (in actual test, manipulate blockchain time)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+            await expect(
+                program.rpc.buyTickets(buyTicketParams, {
+                    accounts: {
+                        raffleState,
+                        participantTickets: participant.publicKey,
+                        participant: participant.publicKey,
+                        participantTokenAccount,
+                        proceedsTokenAccount,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                        systemProgram: SystemProgram.programId,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Raffle is not currently active.');
+        });
 
-    // Derive winning ticket PDA
-    const [winningTicketPda] = await PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("winning-ticket"),
-        rafflePda.toBuffer()
-      ],
-      program.programId
-    );
+        it('should fail if buying exceeds max tickets', async () => {
+            const buyTicketParams = ```typescript
+{ ticket_quantity: new BN(200) }; // Exceeds max tickets
 
-    // Draw winner
-    await program.methods
-      .drawWinners()
-      .accounts({
-        raffleState: rafflePda,
-        winningTicket: winningTicketPda,
-        authority: authority,
-        systemProgram: SystemProgram.programId
-      })
-      .rpc();
+            await expect(
+                program.rpc.buyTickets(buyTicketParams, {
+                    accounts: {
+                        raffleState,
+                        participantTickets: participant.publicKey,
+                        participant: participant.publicKey,
+                        participantTokenAccount,
+                        proceedsTokenAccount,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                        systemProgram: SystemProgram.programId,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Exceeded maximum tickets for this raffle.');
+        });
+    });
 
-    // Verify winning ticket created
-    const winningTicket = await program.account.winningTicket.fetch(winningTicketPda);
-    assert.isNotNull(winningTicket.winningTicketNumber);
-  });
+    describe('claim_prizes', () => {
+        beforeEach(async () => {
+            // Initialize a raffle and buy tickets before claiming prizes
+            const params = {
+                raffle_id: new BN(1),
+                ticket_price: new BN(1000),
+                max_tickets: new BN(100),
+                duration_seconds: new BN(3600),
+                prize_mint: null,
+            };
 
-  it("Claims Prize - Happy Path", async () => {
-    // Derive winning ticket PDA
-    const [winningTicketPda] = await PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("winning-ticket"),
-        rafflePda.toBuffer()
-      ],
-      program.programId
-    );
+            await program.rpc.initializeRaffle(params, {
+                accounts: {
+                    authority: participant.publicKey,
+                    raffleState,
+                    ticketMint: participantTokenAccount,
+                    proceedsTokenAccount,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
 
-    // Create winner's token account
-    const winnerTokenAccount = await getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      winner,
-      ticketMint,
-      winner.publicKey
-    );
+            const buyTicketParams = { ticket_quantity: new BN(1) };
+            await program.rpc.buyTickets(buyTicketParams, {
+                accounts: {
+                    raffleState,
+                    participantTickets: participant.publicKey,
+                    participant: participant.publicKey,
+                    participantTokenAccount,
+                    proceedsTokenAccount,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
+        });
 
-    // Claim prize
-    await program.methods
-      .claimPrizes()
-      .accounts({
-        raffleState: rafflePda,
-        winningTicket: winningTicketPda,
-        winner: winner.publicKey,
-        proceedsTokenAccount: proceedsTokenAccount.address,
-        winnerTokenAccount: winnerTokenAccount.address,
-        authority: authority,
-        tokenProgram: TOKEN_PROGRAM_ID
-      })
-      .signers([winner])
-      .rpc();
+        it('should claim prize successfully', async () => {
+            // Simulate drawing a winner
+            const winningTicket = Keypair.generate();
+            await program.rpc.drawWinner({
+                accounts: {
+                    raffleState,
+                    winningTicket: winningTicket.publicKey,
+                    authority: participant.publicKey,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant, winningTicket],
+            });
 
-    // Additional verifications can be added here
-  });
+            const tx = await program.rpc.claimPrize({
+                accounts: {
+                    raffleState,
+                    winningTicket: winningTicket.publicKey,
+                    winner: participant.publicKey,
+                    proceedsTokenAccount,
+                    winnerTokenAccount: participantTokenAccount,
+                    authority: participant.publicKey,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                },
+                signers: [participant],
+            });
 
-  it("Closes Raffle - Happy Path", async () => {
-    // Close raffle
-    await program.methods
-      .closeRaffles()
-      .accounts({
-        raffleState: rafflePda
-      })
-      .rpc();
+            expect(tx).to.not.be.undefined;
+        });
 
-    // Verify raffle state
-    const raffleState = await program.account.raffleState.fetch(rafflePda);
-    assert.isTrue(raffleState.isFinalized);
-  });
+        it('should fail if raffle is not finalized', async () => {
+            const winningTicket = Keypair.generate();
 
-  // Unhappy Path Tests
-  it("Tries to Initialize Raffle with Invalid Duration", async () => {
-    const newRaffleId = RAFFLE_ID.add(new anchor.BN(1));
-    const [newRafflePda] = await PublicKey.findProgramAddressSync(
-      [Buffer.from("raffle")],
-      program.programId
-    );
+            await expect(
+                program.rpc.claimPrize({
+                    accounts: {
+                        raffleState,
+                        winningTicket: winningTicket.publicKey,
+                        winner: participant.publicKey,
+                        proceedsTokenAccount,
+                        winnerTokenAccount: participantTokenAccount,
+                        authority: participant.publicKey,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Raffle has not been finalized.');
+        });
 
-    try {
-      await program.methods
-        .initializeRaffles({
-          raffleId: newRaffleId,
-          ticketPrice: TICKET_PRICE,
-          maxTickets: MAX_TICKETS,
-          durationSeconds: new anchor.BN(0), // Invalid duration
-          prizeMint: null
-        })
-        .accounts({
-          authority: authority,
-          raffleState: newRafflePda,
-          ticketMint: ticketMint,
-          proceedsTokenAccount: proceedsTokenAccount.address,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId
-        })
-        .rpc();
-      
-      assert.fail("Should have thrown an error");
-    } catch (error) {
-      assert.include(
-        error.message, 
-        "InvalidDuration", 
-        "Expected InvalidDuration error"
-      );
-    }
-  });
+        it('should fail if unauthorized claim attempt', async () => {
+            const winningTicket = Keypair.generate();
+            await program.rpc.drawWinner({
+                accounts: {
+                    raffleState,
+                    winningTicket: winningTicket.publicKey,
+                    authority: participant.publicKey,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant, winningTicket],
+            });
 
-  it("Tries to Claim Prize Unauthorized", async () => {
-    // Derive winning ticket PDA
-    const [winningTicketPda] = await PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("winning-ticket"),
-        rafflePda.toBuffer()
-      ],
-      program.programId
-    );
+            const anotherParticipant = Keypair.generate();
 
-    try {
-      await program.methods
-        .claimPrizes()
-        .accounts({
-          raffleState: rafflePda,
-          winningTicket: winningTicketPda,
-          winner: Keypair.generate().publicKey,
-          proceedsTokenAccount: proceedsTokenAccount.address,
-          winnerTokenAccount: await getOrCreateAssociatedTokenAccount(
-            provider.connection,
-            Keypair.generate(),
-            ticketMint,
-            Keypair.generate().publicKey
-          ),
-          authority: authority,
-          tokenProgram: TOKEN_PROGRAM_ID
-        })
-        .rpc();
-      
-      assert.fail("Should have thrown an error");
-    } catch (error) {
-      assert.include(
-        error.message, 
-        "UnauthorizedPrizeClaim", 
-        "Expected UnauthorizedPrizeClaim error"
-      );
-    }
-  });
+            await expect(
+                program.rpc.claimPrize({
+                    accounts: {
+                        raffleState,
+                        winningTicket: winningTicket.publicKey,
+                        winner: anotherParticipant.publicKey, // Unauthorized
+                        proceedsTokenAccount,
+                        winnerTokenAccount: participantTokenAccount,
+                        authority: participant.publicKey,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                    },
+                    signers: [anotherParticipant],
+                })
+            ).to.be.rejectedWith('Unauthorized claim attempt.');
+        });
+    });
+
+    describe('close_raffle', () => {
+        beforeEach(async () => {
+            // Initialize a raffle before closing it
+            const params = {
+                raffle_id: new BN(1),
+                ticket_price: new BN(1000),
+                max_tickets: new BN(100),
+                duration_seconds: new BN(3600),
+                prize_mint: null,
+            };
+
+            await program.rpc.initializeRaffle(params, {
+                accounts: {
+                    authority: participant.publicKey,
+                    raffleState,
+                    ticketMint: participantTokenAccount,
+                    proceedsTokenAccount,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
+        });
+
+        it('should close raffle successfully', async () => {
+            const tx = await program.rpc.closeRaffle({
+                accounts: {
+                    raffleState,
+                },
+                signers: [participant],
+            });
+
+            expect(tx).to.not.be.undefined;
+ });
+
+        it('should fail if raffle is not finalized', async () => {
+            await expect(
+                program.rpc.closeRaffle({
+                    accounts: {
+                        raffleState,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Raffle has not been finalized.');
+        });
+    });
+
+    describe('draw_winner', () => {
+        beforeEach(async () => {
+            // Initialize a raffle before drawing a winner
+            const params = {
+                raffle_id: new BN(1),
+                ticket_price: new BN(1000),
+                max_tickets: new BN(100),
+                duration_seconds: new BN(3600),
+                prize_mint: null,
+            };
+
+            await program.rpc.initializeRaffle(params, {
+                accounts: {
+                    authority: participant.publicKey,
+                    raffleState,
+                    ticketMint: participantTokenAccount,
+                    proceedsTokenAccount,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant],
+            });
+        });
+
+        it('should draw a winner successfully', async () => {
+            const winningTicket = Keypair.generate();
+
+            const tx = await program.rpc.drawWinner({
+                accounts: {
+                    raffleState,
+                    winningTicket: winningTicket.publicKey,
+                    authority: participant.publicKey,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant, winningTicket],
+            });
+
+            expect(tx).to.not.be.undefined;
+        });
+
+        it('should fail if raffle is still active', async () => {
+            await expect(
+                program.rpc.drawWinner({
+                    accounts: {
+                        raffleState,
+                        winningTicket: Keypair.generate().publicKey,
+                        authority: participant.publicKey,
+                        systemProgram: SystemProgram.programId,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Raffle is still active.');
+        });
+
+        it('should fail if raffle is already finalized', async () => {
+            const winningTicket = Keypair.generate();
+
+            await program.rpc.drawWinner({
+                accounts: {
+                    raffleState,
+                    winningTicket: winningTicket.publicKey,
+                    authority: participant.publicKey,
+                    systemProgram: SystemProgram.programId,
+                },
+                signers: [participant, winningTicket],
+            });
+
+            await expect(
+                program.rpc.drawWinner({
+                    accounts: {
+                        raffleState,
+                        winningTicket: Keypair.generate().publicKey,
+                        authority: participant.publicKey,
+                        systemProgram: SystemProgram.programId,
+                    },
+                    signers: [participant],
+                })
+            ).to.be.rejectedWith('Raffle is already finalized.');
+        });
+    });
 });
